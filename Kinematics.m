@@ -1,4 +1,5 @@
 %% 程序说明：
+%          Kinematics.m 主要是基于位置综合的结果进行机构尺度计算以及运动参量可视化
 %          本程序中的O系指的是和机架固连的坐标系，Om系指的是和连杆固连的坐标系
 %          Pm_Om指的是连杆平面中的点在Om中的坐标
 %          Pm_O指的是连杆平面中的点在O中的坐标
@@ -10,7 +11,7 @@
 %          2号杆坐标系就是位置综合的时候的连杆坐标系
 
 %% 运行位置综合
-Body_Guidance_N_Position_Synthesis;
+Body_Guidance_Four_Position_Synthesis;
 
 %% 清除
 clear all
@@ -49,23 +50,23 @@ alpha_O_val = s.alpha;
 %%
 syms plot_helper_x plot_helper_y
 
-subplot(3, 3, 1);
+subplot(1, 3, 3);
 hold on
 lambda_O_double = double(lambda_O_val);
 alpha_O_double = double(alpha_O_val);
-line_eq = (plot_helper_x+lambda_O_double*sin(alpha_O_double))*sin(alpha_O_double)
-                -(plot_helper_y-lambda_O_double*cos(alpha_O_double))*cos(alpha_O_double);
+line_eq = (plot_helper_x+lambda_O_double*sin(alpha_O_double))*sin(alpha_O_double)-(plot_helper_y-lambda_O_double*cos(alpha_O_double))*cos(alpha_O_double);
 % vpa(circle_eq, 2)
-ezplot(char(line_eq),[-500, 500]);
-
-plot(xc_O_val, yc_O_val, 'b*');
+h = ezplot(char(line_eq),[-600, 600]);
+set(h,'color','k' ,'LineWidth',1)
+% plot(xc_O_val, yc_O_val, 'b*');
 text(xc_O_val, yc_O_val, '圆心点');
 
 circle_eq = (plot_helper_x - double(xc_O_val))^2+(plot_helper_y - double(yc_O_val))^2 - double(r_val)^2
 % vpa(circle_eq, 2)
-ezplot(char(circle_eq),[-500, 500]);
-
+h = ezplot(char(circle_eq),[-500, 500]);
+set(h,'color','k' ,'LineWidth',1)
 hold off
+
 %% 将O系里的圆点、滑点变换到Of系里
 M_O_Of = M_O_Om(alpha_O_val, [xc_O_val, yc_O_val]);
 [~, n] = size(p_c_O_double);
@@ -145,8 +146,10 @@ syms time_t
 omega_l1 = 10/180*pi;  % 杆1角速度[rad/s]
 % syms omega_l1(time_t)
 % 将ω1*time_tt代入解中，得到位移关于时间的方程
+% theta_circle_1_Of = time_t*omega_l1;
 theta_circle_2_Of = subs(s1.theta_circle_2_Of(1), theta_circle_1_Of, time_t*omega_l1);
 t_line_Of = subs(s1.t_line_Of(1), theta_circle_1_Of, time_t*omega_l1);
+theta_circle_1_Of = subs(theta_circle_1_Of, theta_circle_1_Of, time_t*omega_l1);
 
 % 对time_t求导，得到角速度
 d1_theta_circle_2_Of = diff(theta_circle_2_Of, time_t)
@@ -157,41 +160,57 @@ d2_theta_circle_2_Of = diff(d1_theta_circle_2_Of, time_t)
 d2_t_line_Of = diff(d1_t_line_Of, time_t)
 
 subplot(3, 3, 2);
-time_t_double = 0:.1:10;
+grid on
+time_t_double = .1:.11:10;
 yyaxis left
 plot(time_t_double, double(subs(theta_circle_2_Of, time_t, time_t_double)), 'b');
 ylabel("杆2转角θ_2 [rad]")
-subplot(3, 3, 2);
+% subplot(3, 3, 2);
 yyaxis right
 plot(time_t_double, double(subs(t_line_Of, time_t, time_t_double)), 'r');
 ylabel("滑块沿杆移动距离l [mm]")
 xlabel("时间t [s]")
 
 subplot(3, 3, 5);
+grid on
 yyaxis left
 plot(time_t_double, double(subs(d1_theta_circle_2_Of, time_t, time_t_double)), 'b');
 ylabel("杆2转角ω_2 [rad/s]")
-subplot(3, 3, 5);
+% subplot(3, 3, 5);
 yyaxis right
 plot(time_t_double, double(subs(d1_t_line_Of, time_t, time_t_double)), 'r');
 ylabel("滑块沿杆移动速度v  [mm/s]")
 xlabel("时间t [s]")
 
 subplot(3, 3, 8);
+grid on
 yyaxis left
 plot(time_t_double, double(subs(d2_theta_circle_2_Of, time_t, time_t_double)), 'b');
 ylabel("杆2转角α_2 [rad/s^2]")
-subplot(3, 3, 8);
+% subplot(3, 3, 8);
 yyaxis right
 plot(time_t_double, double(subs(d2_t_line_Of, time_t, time_t_double)), 'r');
 ylabel("滑块沿杆移动加速度a [mm/s^2]")
 xlabel("时间t [s]")
 
+%%
+subplot(1, 3, 3);
+title("机构")
+
+%% 瞬心法验证
+subplot(3, 3, 1);
+grid on
+yyaxis right
+plot(time_t_double, double(subs(d1_t_line_Of / omega_l1, time_t, time_t_double)), 'b');  % vc/ω1
+ylabel("vc/ω_1 [mm]")
+yyaxis left
+plot(time_t_double, double(subs(l1*sin(theta_circle_2_Of-theta_circle_1_Of)/cos(theta_circle_2_Of), time_t, time_t_double)), 'r');
+ylabel("AP13 [mm]")
+xlabel("时间t [s]")
 %% 公式导出
 syms alpha_O_latex xc_O_latex yc_O_latex
 M_O_Of = M_O_Om(alpha_O_latex, [xc_O_latex, yc_O_latex]);
 latex(vpa(M_O_Of,2))
-latex()
 % ezplot(char(s1.theta_circle_2_Of(1)),[-.1, 2], [-.2, .5*pi]);
 
 % subplot(2, 2, 2);
